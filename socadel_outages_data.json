@@ -1,0 +1,40 @@
+{
+  "active_outages": [],
+  "past_outages": [],
+  "reports": [],
+  "notifications": [],
+  "clients": {
+    "user_02071d2e": {
+      "name": "gygkukuhjn",
+      "role": "supervisor",
+      "last_seen": "2026-10-17 13:21:06",
+      "location": {
+        "region": "Far North",
+        "division": "Diamar\u00e9",
+        "subdivision": "Maroua I",
+        "quarter": ""
+      },
+      "worker_id": "jjbkbjk"
+    }
+  },
+  "contacts": {
+    "user_02071d2e": {
+      "name": "gygkukuhjn",
+      "role": "supervisor",
+      "email": "kjbkbkb",
+      "phone": "jhvjgjhbj",
+      "location": {
+        "region": "Far North",
+        "division": "Diamar\u00e9",
+        "subdivision": "Maroua I",
+        "quarter": ""
+      },
+      "worker_id": "jjbkbjk",
+      "registered_at": "2026-10-17 13:21:06",
+      "last_updated": "2026-10-17 13:21:06"
+    }
+  },
+  "next_outage_id": 1,
+  "next_notif_id": 1,
+  "next_report_id": 1
+}

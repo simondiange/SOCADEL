@@ -1,15 +1,15 @@
 """
-⚡ SOCADEL Outage Communication System — Complete App
-=====================================================
+⚡ SOCADEL Outage Communication System — Complete App (cascading fix)
+=====================================================================
 Roles: Admin · Supervisor · Client
-Location: Region → Division → Sub-division (official Cameroon structure) + Quarter
-Photos: Opt-in — Camera / Upload / No photos (camera never auto-starts)
+Location: Region → Division → Sub-division — cascades instantly (not inside a form)
+Photos: Opt-in — Camera / Upload / No photos
 Filtering: Clients & Supervisors see outages in their sub-division by default,
            with a "Search another area" option.
 Notifications: In-app popup · Email (SMTP) · WhatsApp (Twilio or wa.me links)
 
-RUN:     pip install -r requirements.txt && streamlit run app.py
-DEPLOY:  Push to GitHub → deploy on https://share.streamlit.io
+RUN:     pip install -r requirements.txt && streamlit run SOC.py
+DEPLOY:  Push to GitHub → Streamlit Cloud redeploys automatically.
 """
 
 import streamlit as st
@@ -48,7 +48,6 @@ MAX_IMAGES_PER_REPORT = 3
 
 # ============================================
 # CAMEROON — OFFICIAL ADMINISTRATIVE STRUCTURE
-# 10 Regions → 58 Divisions → Sub-divisions
 # ============================================
 CAMEROON_LOCATIONS = {
     "Adamawa": {
@@ -717,7 +716,7 @@ def show_landing():
             st.session_state.role = "client_login"; st.rerun()
 
 # ============================================
-# LOGIN SCREENS
+# LOGIN SCREENS  (location OUTSIDE forms — cascade works)
 # ============================================
 def show_admin_login():
     st.markdown("## 🔐 Administrator Login")
@@ -730,7 +729,7 @@ def show_admin_login():
                     st.session_state.role = "admin"; st.rerun()
                 else:
                     st.error("Incorrect password")
-        if st.button("← Back to role selection", use_container_width=True):
+        if st.button("← Back to role selection", use_container_width=True, key="admin_back"):
             st.session_state.role = None; st.rerun()
 
 def show_supervisor_login():
@@ -738,33 +737,38 @@ def show_supervisor_login():
     st.caption("For SOCADEL field workers only.")
     _, col, _ = st.columns([1, 1.5, 1])
     with col:
-        with st.form("supervisor_login_form"):
-            r1c1, r1c2 = st.columns(2)
-            name = r1c1.text_input("Full name")
-            wid  = r1c2.text_input("Worker ID", placeholder="e.g. SOC-1234")
-            r2c1, r2c2 = st.columns(2)
-            email = r2c1.text_input("Email", placeholder="you@example.com")
-            phone = r2c2.text_input("WhatsApp number", placeholder="+237 6XX XXX XXX")
-            code  = st.text_input("Supervisor access code", type="password")
-            st.markdown("**Base location**")
-            loc = location_inputs("sup_login_loc")
-            if st.form_submit_button("Enter Field Portal", type="primary", use_container_width=True):
-                if not (name and wid and code):
-                    st.error("Please fill name, worker ID and access code.")
-                elif code != SUPERVISOR_CODE:
-                    st.error("Invalid supervisor access code.")
-                else:
-                    st.session_state.role = "supervisor"
-                    st.session_state.display_name = name
-                    st.session_state.worker_id = wid
-                    st.session_state.email = email.strip()
-                    st.session_state.phone = phone.strip()
-                    st.session_state.region = loc["region"]
-                    st.session_state.division = loc["division"]
-                    st.session_state.subdivision = loc["subdivision"]
-                    st.session_state.quarter = loc["quarter"]
-                    st.rerun()
-        if st.button("← Back to role selection", use_container_width=True):
+        r1c1, r1c2 = st.columns(2)
+        name = r1c1.text_input("Full name", key="sup_login_name")
+        wid  = r1c2.text_input("Worker ID", placeholder="e.g. SOC-1234",
+                               key="sup_login_wid")
+        r2c1, r2c2 = st.columns(2)
+        email = r2c1.text_input("Email", placeholder="you@example.com",
+                                key="sup_login_email")
+        phone = r2c2.text_input("WhatsApp number", placeholder="+237 6XX XXX XXX",
+                                key="sup_login_phone")
+        code  = st.text_input("Supervisor access code", type="password",
+                              key="sup_login_code")
+        st.markdown("**Base location** *(pick region first → divisions cascade)*")
+        loc = location_inputs("sup_login_loc")
+        st.caption(f"Selected: **{format_location(loc)}**")
+        if st.button("Enter Field Portal", type="primary",
+                     use_container_width=True, key="sup_login_btn"):
+            if not (name and wid and code):
+                st.error("Please fill name, worker ID and access code.")
+            elif code != SUPERVISOR_CODE:
+                st.error("Invalid supervisor access code.")
+            else:
+                st.session_state.role = "supervisor"
+                st.session_state.display_name = name
+                st.session_state.worker_id = wid
+                st.session_state.email = email.strip()
+                st.session_state.phone = phone.strip()
+                st.session_state.region = loc["region"]
+                st.session_state.division = loc["division"]
+                st.session_state.subdivision = loc["subdivision"]
+                st.session_state.quarter = loc["quarter"]
+                st.rerun()
+        if st.button("← Back to role selection", use_container_width=True, key="sup_back"):
             st.session_state.role = None; st.rerun()
 
 def show_client_login():
@@ -772,27 +776,30 @@ def show_client_login():
     st.caption("Enter your name, contact and location — no password needed.")
     _, col, _ = st.columns([1, 1.5, 1])
     with col:
-        with st.form("client_login_form"):
-            r1c1, r1c2 = st.columns(2)
-            name = r1c1.text_input("Your name")
-            email = r1c2.text_input("Email", placeholder="you@example.com")
-            phone = st.text_input("WhatsApp number", placeholder="+237 6XX XXX XXX")
-            st.markdown("**Your location**")
-            loc = location_inputs("cli_login_loc")
-            if st.form_submit_button("Continue", type="primary", use_container_width=True):
-                if not name:
-                    st.error("Please enter your name.")
-                else:
-                    st.session_state.role = "client"
-                    st.session_state.display_name = name
-                    st.session_state.email = email.strip()
-                    st.session_state.phone = phone.strip()
-                    st.session_state.region = loc["region"]
-                    st.session_state.division = loc["division"]
-                    st.session_state.subdivision = loc["subdivision"]
-                    st.session_state.quarter = loc["quarter"]
-                    st.rerun()
-        if st.button("← Back to role selection", use_container_width=True):
+        r1c1, r1c2 = st.columns(2)
+        name = r1c1.text_input("Your name", key="cli_login_name")
+        email = r1c2.text_input("Email", placeholder="you@example.com",
+                                key="cli_login_email")
+        phone = st.text_input("WhatsApp number", placeholder="+237 6XX XXX XXX",
+                              key="cli_login_phone")
+        st.markdown("**Your location** *(pick region first → divisions cascade)*")
+        loc = location_inputs("cli_login_loc")
+        st.caption(f"Selected: **{format_location(loc)}**")
+        if st.button("Continue", type="primary",
+                     use_container_width=True, key="cli_login_btn"):
+            if not name:
+                st.error("Please enter your name.")
+            else:
+                st.session_state.role = "client"
+                st.session_state.display_name = name
+                st.session_state.email = email.strip()
+                st.session_state.phone = phone.strip()
+                st.session_state.region = loc["region"]
+                st.session_state.division = loc["division"]
+                st.session_state.subdivision = loc["subdivision"]
+                st.session_state.quarter = loc["quarter"]
+                st.rerun()
+        if st.button("← Back to role selection", use_container_width=True, key="cli_back"):
             st.session_state.role = None; st.rerun()
 
 # ============================================
@@ -914,59 +921,58 @@ def admin_reports_inbox(data, storage):
             st.markdown("---")
             tab1, tab2, tab3 = st.tabs(["✅ Convert", "📌 Add as Update", "🗑️ Dismiss"])
             with tab1:
-                with st.form(f"convert_form_{r['id']}"):
-                    cc1, cc2 = st.columns(2)
-                    with cc1:
-                        new_issue = st.text_input("Issue", value=r["issue"],
-                                                  key=f"cv_issue_{r['id']}")
-                        new_desc = st.text_area("Description", value=r["description"],
-                                                key=f"cv_desc_{r['id']}", height=90)
-                    with cc2:
-                        sev_opts = ["Critical", "High", "Medium", "Low"]
-                        new_sev = st.selectbox("Severity", sev_opts,
-                            index=sev_opts.index(r["severity"]) if r["severity"] in sev_opts else 2,
-                            key=f"cv_sev_{r['id']}")
-                        new_eta = st.text_input("ETA", key=f"cv_eta_{r['id']}",
-                                                placeholder="e.g. 3 hours")
-                    st.markdown("**Fault location**")
-                    new_loc = location_inputs(f"cv_{r['id']}_loc",
-                        defaults=r.get("location") if isinstance(r.get("location"), dict) else {})
-                    new_area = st.text_input("Additional affected areas",
-                                             key=f"cv_area_{r['id']}")
-                    force = st.checkbox("🔴 Force popup", key=f"cv_force_{r['id']}")
-                    send_email, send_wa = channel_options_ui(data, f"cv_{r['id']}")
-                    if st.form_submit_button("🚀 Convert to Active Outage",
-                                             type="primary", use_container_width=True):
-                        outage = {"id": data["next_outage_id"], "issue": new_issue,
-                                  "description": new_desc, "severity": new_sev,
-                                  "affected_services": new_area, "location": new_loc,
-                                  "images": r.get("images", []),
-                                  "estimated_resolution": new_eta,
-                                  "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                  "status": "active", "updates": []}
-                        data["next_outage_id"] += 1
-                        data["active_outages"].append(outage)
-                        for rr in data["reports"]:
-                            if rr["id"] == r["id"]:
-                                rr["status"] = "converted"
-                                rr["outage_id"] = outage["id"]
-                                rr["admin_note"] = "Converted to active outage"
-                        msg = (f"⚡ CONFIRMED OUTAGE — {new_issue}\n"
-                               f"Severity: {new_sev}\n"
-                               f"Location: {format_location(new_loc)}\n"
-                               f"Description: {new_desc}\n"
-                               f"Additional areas: {new_area}\nETA: {new_eta}")
-                        add_notification(data, msg, force_popup=force,
-                                         outage_id=outage["id"])
-                        storage.save(data)
-                        st.success(f"✅ Outage #{outage['id']} created from report #{r['id']}.")
-                        if send_email or send_wa:
-                            report = dispatch_to_channels(data, msg,
-                                subject=f"⚡ SOCADEL Outage: {new_issue[:60]}",
-                                send_email_flag=send_email, send_wa_flag=send_wa)
-                            st.markdown("### 📤 Delivery results")
-                            render_dispatch_report(report)
-                        st.rerun()
+                cc1, cc2 = st.columns(2)
+                with cc1:
+                    new_issue = st.text_input("Issue", value=r["issue"],
+                                              key=f"cv_issue_{r['id']}")
+                    new_desc = st.text_area("Description", value=r["description"],
+                                            key=f"cv_desc_{r['id']}", height=90)
+                with cc2:
+                    sev_opts = ["Critical", "High", "Medium", "Low"]
+                    new_sev = st.selectbox("Severity", sev_opts,
+                        index=sev_opts.index(r["severity"]) if r["severity"] in sev_opts else 2,
+                        key=f"cv_sev_{r['id']}")
+                    new_eta = st.text_input("ETA", key=f"cv_eta_{r['id']}",
+                                            placeholder="e.g. 3 hours")
+                st.markdown("**Fault location** *(cascade works — pick region first)*")
+                new_loc = location_inputs(f"cv_{r['id']}_loc",
+                    defaults=r.get("location") if isinstance(r.get("location"), dict) else {})
+                new_area = st.text_input("Additional affected areas",
+                                         key=f"cv_area_{r['id']}")
+                force = st.checkbox("🔴 Force popup", key=f"cv_force_{r['id']}")
+                send_email, send_wa = channel_options_ui(data, f"cv_{r['id']}")
+                if st.button("🚀 Convert to Active Outage", type="primary",
+                             use_container_width=True, key=f"cv_btn_{r['id']}"):
+                    outage = {"id": data["next_outage_id"], "issue": new_issue,
+                              "description": new_desc, "severity": new_sev,
+                              "affected_services": new_area, "location": new_loc,
+                              "images": r.get("images", []),
+                              "estimated_resolution": new_eta,
+                              "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                              "status": "active", "updates": []}
+                    data["next_outage_id"] += 1
+                    data["active_outages"].append(outage)
+                    for rr in data["reports"]:
+                        if rr["id"] == r["id"]:
+                            rr["status"] = "converted"
+                            rr["outage_id"] = outage["id"]
+                            rr["admin_note"] = "Converted to active outage"
+                    msg = (f"⚡ CONFIRMED OUTAGE — {new_issue}\n"
+                           f"Severity: {new_sev}\n"
+                           f"Location: {format_location(new_loc)}\n"
+                           f"Description: {new_desc}\n"
+                           f"Additional areas: {new_area}\nETA: {new_eta}")
+                    add_notification(data, msg, force_popup=force,
+                                     outage_id=outage["id"])
+                    storage.save(data)
+                    st.success(f"✅ Outage #{outage['id']} created from report #{r['id']}.")
+                    if send_email or send_wa:
+                        report = dispatch_to_channels(data, msg,
+                            subject=f"⚡ SOCADEL Outage: {new_issue[:60]}",
+                            send_email_flag=send_email, send_wa_flag=send_wa)
+                        st.markdown("### 📤 Delivery results")
+                        render_dispatch_report(report)
+                    st.rerun()
             with tab2:
                 if not data["active_outages"]:
                     st.info("No active outages to attach this report to.")
@@ -1015,63 +1021,68 @@ def admin_reports_inbox(data, storage):
 
 def admin_create_outage(data, storage):
     st.subheader("📝 Create New Outage Report")
-    with st.form("create_outage_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            issue = st.selectbox("Issue Type", [
-                "Complete Power Outage (Blackout)",
-                "Partial Power Outage", "Frequent Fluctuations",
-                "Low Voltage", "High Voltage / Surge",
-                "Transformer Failure", "Damaged / Downed Power Lines",
-                "Fallen Electric Pole", "Vandalized Equipment",
-                "Cable Theft", "Substation Fault", "Short Circuit",
-                "Fire Hazard", "Meter Malfunction",
-                "Meter Reading Dispute", "Illegal Connection",
-                "Load Shedding", "Planned Maintenance",
-                "Billing / Payment Issue", "Other"])
-            description = st.text_area("Detailed Description", height=120)
-        with c2:
-            severity = st.selectbox("Severity", ["Critical", "High", "Medium", "Low"])
-            eta = st.text_input("Estimated Restoration", placeholder="e.g. 3 hours")
-        st.markdown("**Fault location**")
-        loc = location_inputs("ao_loc")
-        affected = st.text_input("Additional affected areas / notes")
-        st.markdown("---")
-        c3, c4 = st.columns(2)
-        with c3: send_notif = st.checkbox("Send in-app notification", value=True)
-        with c4: force_popup = st.checkbox("🔴 Force popup on all users", value=False)
-        st.markdown("**External channels**")
-        send_email, send_wa = channel_options_ui(data, "ao")
-        submitted = st.form_submit_button("🚀 Create Outage",
-                                          type="primary", use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        issue = st.selectbox("Issue Type", [
+            "Complete Power Outage (Blackout)",
+            "Partial Power Outage", "Frequent Fluctuations",
+            "Low Voltage", "High Voltage / Surge",
+            "Transformer Failure", "Damaged / Downed Power Lines",
+            "Fallen Electric Pole", "Vandalized Equipment",
+            "Cable Theft", "Substation Fault", "Short Circuit",
+            "Fire Hazard", "Meter Malfunction",
+            "Meter Reading Dispute", "Illegal Connection",
+            "Load Shedding", "Planned Maintenance",
+            "Billing / Payment Issue", "Other"], key="ao_issue")
+        description = st.text_area("Detailed Description", height=120,
+                                   key="ao_description")
+    with c2:
+        severity = st.selectbox("Severity", ["Critical", "High", "Medium", "Low"],
+                                key="ao_severity")
+        eta = st.text_input("Estimated Restoration",
+                            placeholder="e.g. 3 hours", key="ao_eta")
+    st.markdown("**Fault location** *(region → division → sub-division cascade)*")
+    loc = location_inputs("ao_loc")
+    st.caption(f"Selected: **{format_location(loc)}**")
+    affected = st.text_input("Additional affected areas / notes", key="ao_affected")
+    st.markdown("---")
+    c3, c4 = st.columns(2)
+    with c3: send_notif = st.checkbox("Send in-app notification", value=True,
+                                      key="ao_send_notif")
+    with c4: force_popup = st.checkbox("🔴 Force popup on all users", value=False,
+                                       key="ao_force_popup")
+    st.markdown("**External channels**")
+    send_email, send_wa = channel_options_ui(data, "ao")
     images = capture_images("admin_outage")
-    if submitted:
+    if st.button("🚀 Create Outage", type="primary",
+                 use_container_width=True, key="ao_submit"):
         if not description:
-            st.error("Please provide a description."); return
-        outage = {"id": data["next_outage_id"], "issue": issue,
-                  "description": description, "severity": severity,
-                  "affected_services": affected, "location": loc,
-                  "images": images,
-                  "estimated_resolution": eta,
-                  "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                  "status": "active", "updates": []}
-        data["next_outage_id"] += 1
-        data["active_outages"].append(outage)
-        msg = (f"⚡ NEW OUTAGE — {issue}\nSeverity: {severity}\n"
-               f"Location: {format_location(loc)}\nDescription: {description}\n"
-               f"Additional areas: {affected}\nETA: {eta}")
-        if send_notif:
-            add_notification(data, msg, force_popup=force_popup,
-                             outage_id=outage["id"])
-        storage.save(data)
-        st.success(f"✅ Outage #{outage['id']} created.")
-        if send_email or send_wa:
-            report = dispatch_to_channels(data, msg,
-                subject=f"⚡ SOCADEL Outage: {issue[:60]}",
-                send_email_flag=send_email, send_wa_flag=send_wa)
-            st.markdown("### 📤 Delivery results")
-            render_dispatch_report(report)
-        st.rerun()
+            st.error("Please provide a description.")
+        else:
+            outage = {"id": data["next_outage_id"], "issue": issue,
+                      "description": description, "severity": severity,
+                      "affected_services": affected, "location": loc,
+                      "images": images,
+                      "estimated_resolution": eta,
+                      "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                      "status": "active", "updates": []}
+            data["next_outage_id"] += 1
+            data["active_outages"].append(outage)
+            msg = (f"⚡ NEW OUTAGE — {issue}\nSeverity: {severity}\n"
+                   f"Location: {format_location(loc)}\nDescription: {description}\n"
+                   f"Additional areas: {affected}\nETA: {eta}")
+            if send_notif:
+                add_notification(data, msg, force_popup=force_popup,
+                                 outage_id=outage["id"])
+            storage.save(data)
+            st.success(f"✅ Outage #{outage['id']} created.")
+            if send_email or send_wa:
+                report = dispatch_to_channels(data, msg,
+                    subject=f"⚡ SOCADEL Outage: {issue[:60]}",
+                    send_email_flag=send_email, send_wa_flag=send_wa)
+                st.markdown("### 📤 Delivery results")
+                render_dispatch_report(report)
+            st.rerun()
 
 def admin_manage_outages(data, storage):
     st.subheader("📋 Manage Active Outages")
@@ -1146,18 +1157,19 @@ def admin_send_notification(data, storage):
         send_email, send_wa = channel_options_ui(data, "sn")
         if st.form_submit_button("📤 Send", use_container_width=True):
             if not message:
-                st.error("Please enter a message."); return
-            body = f"{ntype} [{severity}]: {message}"
-            add_notification(data, body, force_popup=force)
-            storage.save(data)
-            st.success("✅ Sent in-app." + (" (FORCE POPUP)" if force else ""))
-            if send_email or send_wa:
-                report = dispatch_to_channels(data, body,
-                    subject=f"📢 SOCADEL: {ntype} [{severity}]",
-                    send_email_flag=send_email, send_wa_flag=send_wa)
-                st.markdown("### 📤 Delivery results")
-                render_dispatch_report(report)
-            st.rerun()
+                st.error("Please enter a message.")
+            else:
+                body = f"{ntype} [{severity}]: {message}"
+                add_notification(data, body, force_popup=force)
+                storage.save(data)
+                st.success("✅ Sent in-app." + (" (FORCE POPUP)" if force else ""))
+                if send_email or send_wa:
+                    report = dispatch_to_channels(data, body,
+                        subject=f"📢 SOCADEL: {ntype} [{severity}]",
+                        send_email_flag=send_email, send_wa_flag=send_wa)
+                    st.markdown("### 📤 Delivery results")
+                    render_dispatch_report(report)
+                st.rerun()
 
 def admin_force_popup(data, storage):
     st.subheader("🔴 Force Emergency Popup")
@@ -1172,18 +1184,19 @@ def admin_force_popup(data, storage):
         if st.form_submit_button("🔴 SEND FORCE POPUP",
                                  type="primary", use_container_width=True):
             if not message:
-                st.error("Please enter a message."); return
-            body = f"{title}\n\n{message}\n\nSeverity: {severity}"
-            add_notification(data, body, force_popup=True)
-            storage.save(data)
-            st.error("🔴 FORCE POPUP SENT.")
-            st.balloons()
-            if send_email or send_wa:
-                report = dispatch_to_channels(data, body,
-                    subject=f"🚨 SOCADEL URGENT: {title}",
-                    send_email_flag=send_email, send_wa_flag=send_wa)
-                st.markdown("### 📤 Delivery results")
-                render_dispatch_report(report)
+                st.error("Please enter a message.")
+            else:
+                body = f"{title}\n\n{message}\n\nSeverity: {severity}"
+                add_notification(data, body, force_popup=True)
+                storage.save(data)
+                st.error("🔴 FORCE POPUP SENT.")
+                st.balloons()
+                if send_email or send_wa:
+                    report = dispatch_to_channels(data, body,
+                        subject=f"🚨 SOCADEL URGENT: {title}",
+                        send_email_flag=send_email, send_wa_flag=send_wa)
+                    st.markdown("### 📤 Delivery results")
+                    render_dispatch_report(report)
 
 def admin_history(data):
     st.subheader("📜 Outage History")
@@ -1402,7 +1415,7 @@ def sup_report(data, storage):
         severity = st.selectbox("Severity",
                                 ["Critical", "High", "Medium", "Low"],
                                 key="sup_rep_sev")
-    st.markdown("**Location of the fault** *(defaults to your base)*")
+    st.markdown("**Location of the fault** *(defaults to your base — cascade works)*")
     loc = location_inputs("sup_rep_loc", defaults=current_user_location())
     images = capture_images("sup_report")
     if st.button("📤 Submit Report", type="primary",
@@ -1562,7 +1575,7 @@ def cli_report(data, storage):
         severity = st.selectbox("How bad is it?",
                                 ["Critical", "High", "Medium", "Low"],
                                 key="cli_rep_sev")
-    st.markdown("**Location of the issue** *(defaults to your profile)*")
+    st.markdown("**Location of the issue** *(defaults to your profile — cascade works)*")
     loc = location_inputs("cli_rep_loc", defaults=current_user_location())
     images = capture_images("cli_report")
     if st.button("📤 Submit Report", type="primary",
